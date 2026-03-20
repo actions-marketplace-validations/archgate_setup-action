@@ -1,0 +1,50 @@
+name: "Setup Archgate"
+description: "Install the Archgate CLI and add it to PATH. Supports Ubuntu, macOS, and Windows runners. Enforces architecture decisions as code."
+author: "Archgate"
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  version:
+    description: "Archgate version to install (e.g. v0.14.0). Defaults to latest."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Archgate (Linux/macOS)
+      if: runner.os != 'Windows'
+      shell: bash
+      env:
+        ARCHGATE_VERSION: ${{ inputs.version }}
+      run: |
+        curl -fsSL https://cli.archgate.dev/install-unix | sh
+
+    - name: Install Archgate (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        ARCHGATE_VERSION: ${{ inputs.version }}
+      run: |
+        irm https://cli.archgate.dev/install-windows | iex
+
+    - name: Add Archgate to PATH (Linux/macOS)
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        install_dir="${ARCHGATE_INSTALL_DIR:-$HOME/.archgate/bin}"
+        echo "$install_dir" >> "$GITHUB_PATH"
+
+    - name: Add Archgate to PATH (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $installDir = if ($env:ARCHGATE_INSTALL_DIR) { $env:ARCHGATE_INSTALL_DIR } else { "$HOME\.archgate\bin" }
+        echo $installDir >> $env:GITHUB_PATH
+
+    - name: Verify installation
+      shell: bash
+      run: |
+        archgate --version
