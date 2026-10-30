@@ -1,0 +1,53 @@
+name: Validate
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Action
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      # Workflow syntax, expression and shell checks.
+      - name: actionlint
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 # v1.7.12
+
+      # Security audit of the workflows and of action.yml. Covers the pinning
+      # rules this repository cares about: unpinned-uses and unpinned-images.
+      - name: zizmor
+        uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+        with:
+          advanced-security: false
+          annotations: true
+
+  # Gate job — single required status check for the org ruleset.
+  status:
+    name: Validate Code
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [validate]
+    steps:
+      - name: Check job results
+        env:
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+        run: |
+          if [[ "$VALIDATE_RESULT" != "success" ]]; then
+            echo "::error::Validation failed: $VALIDATE_RESULT"
+            exit 1
+          fi
+          echo "All checks passed."
